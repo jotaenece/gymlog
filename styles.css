@@ -690,3 +690,31 @@ img { display: block; }
   .muscle-grid { grid-template-columns: repeat(4, 1fr); }
   .sticky-bottom { max-width: 600px; margin: 0 auto; left: 0; right: 0; }
 }
+
+/* ── Fallback cuando la imagen no carga ──────────────────── */
+.exercise-card-img-wrap.img-failed,
+.workout-ex-thumb.img-failed {
+  background: var(--bg3);
+}
+.exercise-card-img-wrap.img-failed::after {
+  content: "💪";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 56px;
+  font-size: 1.6rem;
+  background: var(--bg3);
+  border-radius: 8px;
+}
+.workout-ex-thumb.img-failed::after {
+  content: "💪";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 1.6rem;
+  background: var(--bg3);
+  border-radius: 8px;
+}

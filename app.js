@@ -66,7 +66,7 @@ function selectMuscle(muscleId) {
     <div class="exercise-card" id="ex-card-${ex.id}" onclick="toggleExercise('${ex.id}')">
       <div class="exercise-card-img-wrap">
         <img class="exercise-thumb" src="${ex.img}" alt="${ex.name}" 
-          onerror="this.src='https://via.placeholder.com/120x80/1a1a2e/ffffff?text=💪'"
+          onerror="this.style.display='none';this.parentElement.classList.add('img-failed')"
           loading="lazy" />
         <button class="exercise-img-btn" onclick="event.stopPropagation(); openModal('${ex.id}')">🔍</button>
       </div>
@@ -133,7 +133,7 @@ function renderWorkoutBody() {
     <div class="workout-exercise" id="workout-ex-${exIdx}">
       <div class="workout-ex-header">
         <img class="workout-ex-thumb" src="${ex.img}" alt="${ex.name}"
-          onerror="this.src='https://via.placeholder.com/56x56/1a1a2e/ffffff?text=💪'" />
+          onerror="this.style.display='none';this.parentElement.classList.add('img-failed')" />
         <div>
           <h3 class="workout-ex-name">${ex.name}</h3>
           <span class="workout-ex-sets-count" id="sets-count-${exIdx}">0 series</span>
