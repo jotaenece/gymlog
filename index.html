@@ -2,8 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff6b35" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GymLog" />
   <title>GymLog — Tu Diario de Entrenamiento</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -22,15 +27,26 @@
           <p class="logo-sub">Tu diario de entrenamiento</p>
         </div>
 
-        <div class="home-actions">
-          <button class="btn-primary" onclick="goTo('screen-add')">
-            <span class="btn-icon">＋</span>
-            Nuevo Entrenamiento
-          </button>
-          <button class="btn-secondary" onclick="goTo('screen-history')">
-            <span class="btn-icon">📋</span>
-            Ver Historial
-          </button>
+        <button class="btn-primary btn-cta" onclick="goToNav('screen-add')">
+          <span class="btn-icon">＋</span>
+          Nuevo Entrenamiento
+        </button>
+
+        <div id="home-quick-stats" class="home-quick-stats hidden">
+          <div class="quick-stat">
+            <span class="qs-val" id="qs-streak">0</span>
+            <span class="qs-lbl">racha días</span>
+          </div>
+          <div class="quick-stat-divider"></div>
+          <div class="quick-stat">
+            <span class="qs-val" id="qs-total">0</span>
+            <span class="qs-lbl">entrenos</span>
+          </div>
+          <div class="quick-stat-divider"></div>
+          <div class="quick-stat">
+            <span class="qs-val" id="qs-week">0</span>
+            <span class="qs-lbl">esta semana</span>
+          </div>
         </div>
 
         <div id="today-summary" class="today-summary hidden">
@@ -44,8 +60,7 @@
   <!-- PANTALLA: NUEVO ENTRENAMIENTO -->
   <div id="screen-add" class="screen">
     <div class="screen-header">
-      <button class="back-btn" onclick="goTo('screen-home')">← Volver</button>
-      <h2 class="screen-title">Nuevo Entrenamiento</h2>
+      <h2 class="screen-title">Entrenar</h2>
     </div>
     <div class="screen-body">
       <p class="section-label">ELIGE GRUPO MUSCULAR</p>
@@ -60,11 +75,17 @@
       <h2 class="screen-title" id="exercises-title">Ejercicios</h2>
     </div>
     <div class="screen-body">
-      <p class="section-label">SELECCIONA EJERCICIOS</p>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="search" class="search-input" id="exercise-search"
+          placeholder="Buscar ejercicio…" autocomplete="off"
+          oninput="filterExercises(this.value)" />
+      </div>
+      <p class="section-label" style="margin-top:16px">SELECCIONA EJERCICIOS</p>
       <div id="exercises-list" class="exercises-list"></div>
       <div class="sticky-bottom">
-        <button class="btn-primary" id="start-workout-btn" onclick="startWorkout()">
-          Iniciar Entrenamiento
+        <button class="btn-primary" id="start-workout-btn" onclick="startWorkout()" disabled>
+          Selecciona ejercicios
         </button>
       </div>
     </div>
@@ -77,16 +98,27 @@
         <span id="workout-muscle-label" class="workout-badge"></span>
         <span id="workout-timer" class="workout-timer">00:00</span>
       </div>
-      <button class="btn-finish" onclick="finishWorkout()">Finalizar</button>
+      <div class="workout-header-right">
+        <button class="btn-rest-toggle" id="rest-toggle-btn" onclick="toggleRestTimerEnabled()" title="Temporizador descanso">⏱</button>
+        <button class="btn-finish" onclick="confirmFinishWorkout()">Finalizar</button>
+      </div>
     </div>
     <div class="screen-body" id="workout-body"></div>
+  </div>
+
+  <!-- PANTALLA: ESTADÍSTICAS -->
+  <div id="screen-stats" class="screen">
+    <div class="screen-header">
+      <h2 class="screen-title">Estadísticas</h2>
+    </div>
+    <div class="screen-body" id="stats-body"></div>
   </div>
 
   <!-- PANTALLA: HISTORIAL -->
   <div id="screen-history" class="screen">
     <div class="screen-header">
-      <button class="back-btn" onclick="goTo('screen-home')">← Volver</button>
       <h2 class="screen-title">Historial</h2>
+      <button class="header-icon-btn" onclick="exportData()" title="Exportar datos">⬇</button>
     </div>
     <div class="screen-body" id="history-body">
       <p class="empty-state">No hay entrenamientos registrados todavía.</p>
@@ -96,12 +128,67 @@
   <!-- PANTALLA: RESUMEN FINAL -->
   <div id="screen-summary" class="screen">
     <div class="screen-header">
-      <h2 class="screen-title">¡Entrenamiento completado!</h2>
+      <h2 class="screen-title">¡Completado! 🎉</h2>
     </div>
     <div class="screen-body" id="summary-body"></div>
     <div class="sticky-bottom">
-      <button class="btn-primary" onclick="goTo('screen-home')">Volver al inicio</button>
+      <button class="btn-primary" onclick="goToNav('screen-home')">Volver al inicio</button>
     </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="nav-item active" data-screen="screen-home" onclick="goToNav('screen-home')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Inicio</span>
+    </button>
+    <button class="nav-item" data-screen="screen-add" onclick="goToNav('screen-add')">
+      <span class="nav-icon-plus">＋</span>
+      <span class="nav-label">Entrenar</span>
+    </button>
+    <button class="nav-item" data-screen="screen-stats" onclick="goToNav('screen-stats')">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Stats</span>
+    </button>
+    <button class="nav-item" data-screen="screen-history" onclick="goToNav('screen-history')">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Historial</span>
+    </button>
+  </nav>
+
+  <!-- REST TIMER OVERLAY -->
+  <div id="rest-timer-overlay" class="rest-timer-overlay hidden">
+    <div class="rest-timer-card">
+      <p class="rest-timer-title">DESCANSO</p>
+      <div class="rest-timer-ring-wrap">
+        <svg class="rest-timer-svg" viewBox="0 0 120 120">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle class="ring-progress" cx="60" cy="60" r="52" id="ring-progress"/>
+        </svg>
+        <div class="rest-timer-center">
+          <span class="rest-countdown" id="rest-countdown">90</span>
+          <span class="rest-unit">seg</span>
+        </div>
+      </div>
+      <div class="rest-timer-presets">
+        <button class="preset-btn" onclick="changeRestPreset(30)">30s</button>
+        <button class="preset-btn" onclick="changeRestPreset(60)">1m</button>
+        <button class="preset-btn" id="preset-90" onclick="changeRestPreset(90)">1:30</button>
+        <button class="preset-btn" onclick="changeRestPreset(120)">2m</button>
+        <button class="preset-btn" onclick="changeRestPreset(180)">3m</button>
+      </div>
+      <div class="rest-timer-actions">
+        <button class="rest-btn-adj" onclick="addRestTime(-15)">−15s</button>
+        <button class="rest-btn-skip" onclick="skipRestTimer()">Saltar ▶</button>
+        <button class="rest-btn-adj" onclick="addRestTime(15)">+15s</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PR TOAST -->
+  <div id="pr-toast" class="pr-toast hidden">
+    <span>🏆</span>
+    <span>¡NUEVO RÉCORD PERSONAL!</span>
   </div>
 
   <!-- MODAL: Imagen del ejercicio -->
@@ -111,6 +198,7 @@
       <img id="modal-img" src="" alt="Ejercicio" />
       <h3 id="modal-name"></h3>
       <p id="modal-desc"></p>
+      <div id="modal-pr" class="modal-pr hidden"></div>
     </div>
   </div>
 
