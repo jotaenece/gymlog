@@ -472,6 +472,19 @@ img { display: block; }
 .pr-toast.hidden { display: none; }
 .pr-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+.auth-error.success {
+  background: #39d98a15; border-color: #39d98a40; color: var(--green);
+}
+.auth-forgot-link, .auth-back-link {
+  background: none; border: none; color: var(--text2);
+  font-size: .82rem; padding: 2px 0; text-align: left;
+  text-decoration: underline; text-underline-offset: 3px;
+  transition: color .2s;
+}
+.auth-forgot-link:hover, .auth-back-link:hover { color: var(--orange); }
+.auth-forgot-link.hidden, .auth-back-link.hidden { display: none; }
+.auth-email-wrap.hidden, .auth-password-wrap.hidden { display: none; }
+
 /* ── Auth Screen ───────────────────────────────────────── */
 .auth-bg {
   flex: 1;

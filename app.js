@@ -1073,14 +1073,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (data.session) {
     currentUser = data.session.user;
     await onSignedIn();
+  } else {
+    // Ensure nav stays hidden and auth screen is shown
+    goTo("screen-auth");
   }
-  // else: screen-auth is already active (set in HTML)
 
-  // React to auth state changes (e.g. email confirmation link)
+  // React to auth state changes (email confirmation link, password reset)
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" && session && !currentUser) {
       currentUser = session.user;
       await onSignedIn();
+    }
+    if (event === "PASSWORD_RECOVERY") {
+      showResetMode();
     }
   });
 });
