@@ -13,11 +13,40 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
+  <!-- PANTALLA: AUTH -->
+  <div id="screen-auth" class="screen active">
+    <div class="auth-bg">
+      <div class="noise-overlay"></div>
+      <div class="auth-content">
+        <div class="logo-area">
+          <div class="logo-icon">⚡</div>
+          <h1 class="logo-title">GymLog</h1>
+          <p class="logo-sub">Tu diario de entrenamiento</p>
+        </div>
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-mode="login" onclick="switchAuthTab('login')">Iniciar sesión</button>
+            <button class="auth-tab" data-mode="register" onclick="switchAuthTab('register')">Crear cuenta</button>
+          </div>
+          <div id="auth-error" class="auth-error hidden"></div>
+          <div class="auth-fields">
+            <input type="email" id="auth-email" class="auth-input" placeholder="Email" autocomplete="email"
+              onkeydown="if(event.key==='Enter') document.getElementById('auth-password').focus()" />
+            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña (mín. 6 caracteres)"
+              autocomplete="current-password" onkeydown="if(event.key==='Enter') handleAuth()" />
+          </div>
+          <button class="btn-primary" id="auth-submit-btn" onclick="handleAuth()">Iniciar sesión</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- PANTALLA: INICIO -->
-  <div id="screen-home" class="screen active">
+  <div id="screen-home" class="screen">
     <div class="home-bg">
       <div class="noise-overlay"></div>
       <div class="home-content">
@@ -26,6 +55,8 @@
           <h1 class="logo-title">GymLog</h1>
           <p class="logo-sub">Tu diario de entrenamiento</p>
         </div>
+
+        <div id="home-user-bar" class="home-user-bar hidden"></div>
 
         <button class="btn-primary btn-cta" onclick="goToNav('screen-add')">
           <span class="btn-icon">＋</span>
@@ -83,6 +114,26 @@
       </div>
       <p class="section-label" style="margin-top:16px">SELECCIONA EJERCICIOS</p>
       <div id="exercises-list" class="exercises-list"></div>
+
+      <!-- Formulario: crear ejercicio personalizado -->
+      <div id="custom-ex-form" class="custom-ex-form hidden">
+        <p class="section-label" style="margin-bottom:12px">NUEVO EJERCICIO PERSONALIZADO</p>
+        <input type="text" id="custom-ex-name" class="auth-input"
+          placeholder="Nombre del ejercicio *"
+          onkeydown="if(event.key==='Enter') document.getElementById('custom-ex-desc').focus()" />
+        <input type="text" id="custom-ex-desc" class="auth-input"
+          placeholder="Descripción (opcional)"
+          onkeydown="if(event.key==='Enter') confirmCustomExercise()" />
+        <div class="custom-ex-actions">
+          <button class="btn-secondary" onclick="closeCustomExForm()">Cancelar</button>
+          <button class="btn-primary" onclick="confirmCustomExercise()">Crear y añadir</button>
+        </div>
+      </div>
+
+      <button class="btn-add-custom-ex" id="btn-add-custom-ex" onclick="openCustomExForm()">
+        ＋ Crear ejercicio personalizado
+      </button>
+
       <div class="sticky-bottom">
         <button class="btn-primary" id="start-workout-btn" onclick="startWorkout()" disabled>
           Selecciona ejercicios
@@ -202,6 +253,7 @@
     </div>
   </div>
 
+  <script src="supabase-config.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>

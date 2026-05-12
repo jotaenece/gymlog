@@ -9,6 +9,7 @@ let activeWorkout = null;
 let timerInterval = null;
 let timerSeconds = 0;
 let currentExerciseList = [];
+let currentUser = null; // logged-in Supabase user
 
 // ── Rest Timer state ──────────────────────────────────────
 let restInterval = null;
@@ -18,7 +19,7 @@ let restEnabled = true;
 
 // ── Navegación ────────────────────────────────────────────
 const NAV_SCREENS = ["screen-home", "screen-add", "screen-stats", "screen-history"];
-const HIDE_NAV_SCREENS = ["screen-workout", "screen-summary", "screen-exercises"];
+const HIDE_NAV_SCREENS = ["screen-workout", "screen-summary", "screen-exercises", "screen-auth"];
 
 function goTo(screenId) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
@@ -102,14 +103,69 @@ function initMuscleGrid() {
   `).join("");
 }
 
+// ── Ejercicios personalizados ─────────────────────────────
+function getCustomExercises(muscleId) {
+  try {
+    const all = JSON.parse(localStorage.getItem("gymlog_custom_exercises") || "{}");
+    return all[muscleId] || [];
+  } catch { return []; }
+}
+
+function saveCustomExercise(muscleId, exercise) {
+  try {
+    const all = JSON.parse(localStorage.getItem("gymlog_custom_exercises") || "{}");
+    if (!all[muscleId]) all[muscleId] = [];
+    all[muscleId].push(exercise);
+    localStorage.setItem("gymlog_custom_exercises", JSON.stringify(all));
+  } catch {}
+}
+
+function openCustomExForm() {
+  document.getElementById("custom-ex-form").classList.remove("hidden");
+  document.getElementById("btn-add-custom-ex").classList.add("hidden");
+  document.getElementById("custom-ex-name").value = "";
+  document.getElementById("custom-ex-desc").value = "";
+  document.getElementById("custom-ex-name").focus();
+}
+
+function closeCustomExForm() {
+  document.getElementById("custom-ex-form").classList.add("hidden");
+  document.getElementById("btn-add-custom-ex").classList.remove("hidden");
+}
+
+function confirmCustomExercise() {
+  const nameEl = document.getElementById("custom-ex-name");
+  const name = nameEl.value.trim();
+  if (!name) {
+    nameEl.classList.add("input-error");
+    setTimeout(() => nameEl.classList.remove("input-error"), 800);
+    nameEl.focus();
+    return;
+  }
+  const desc = document.getElementById("custom-ex-desc").value.trim();
+  const exercise = {
+    id: `custom_${Date.now()}`,
+    name,
+    desc: desc || "Ejercicio personalizado",
+    img: "",
+    custom: true,
+  };
+  saveCustomExercise(currentMuscle, exercise);
+  currentExerciseList.push(exercise);
+  closeCustomExForm();
+  renderExerciseList(currentExerciseList);
+  toggleExercise(exercise.id);
+}
+
 function selectMuscle(muscleId) {
   currentMuscle = muscleId;
   selectedExercises = [];
   const muscle = MUSCLE_GROUPS.find(m => m.id === muscleId);
   document.getElementById("exercises-title").textContent = muscle.name;
   document.getElementById("exercise-search").value = "";
+  closeCustomExForm();
 
-  currentExerciseList = EXERCISES[muscleId] || [];
+  currentExerciseList = [...(EXERCISES[muscleId] || []), ...getCustomExercises(muscleId)];
   renderExerciseList(currentExerciseList);
   updateStartBtn();
   goTo("screen-exercises");
@@ -131,17 +187,21 @@ function renderExerciseList(exercises) {
   }
   list.innerHTML = exercises.map(ex => {
     const isSelected = selectedExercises.includes(ex.id);
+    const imgBlock = ex.img
+      ? `<img class="exercise-thumb" src="${ex.img}" alt="${ex.name}"
+          onerror="this.style.display='none';this.parentElement.classList.add('img-failed')" loading="lazy" />
+         <button class="exercise-img-btn" onclick="event.stopPropagation(); openModal('${ex.id}')">🔍</button>`
+      : `<div class="exercise-thumb-placeholder">🏋️</div>`;
+    const badge = ex.custom ? `<span class="exercise-card-badge">CUSTOM</span>` : "";
     return `
     <div class="exercise-card${isSelected ? " selected" : ""}" id="ex-card-${ex.id}" onclick="toggleExercise('${ex.id}')">
       <div class="exercise-card-img-wrap">
-        <img class="exercise-thumb" src="${ex.img}" alt="${ex.name}"
-          onerror="this.style.display='none';this.parentElement.classList.add('img-failed')"
-          loading="lazy" />
-        <button class="exercise-img-btn" onclick="event.stopPropagation(); openModal('${ex.id}')">🔍</button>
+        ${imgBlock}
+        ${badge}
       </div>
       <div class="exercise-card-info">
         <h3 class="exercise-name">${ex.name}</h3>
-        <p class="exercise-desc">${ex.desc.substring(0, 70)}…</p>
+        <p class="exercise-desc">${(ex.desc || "").substring(0, 70)}${ex.desc && ex.desc.length > 70 ? "…" : ""}</p>
       </div>
       <div class="exercise-check${isSelected ? " visible" : ""}" id="check-${ex.id}">✓</div>
     </div>
@@ -181,8 +241,10 @@ function startWorkout() {
     date: new Date().toISOString(),
     muscle: currentMuscle,
     exercises: selectedExercises.map(exId => {
-      const ex = EXERCISES[currentMuscle].find(e => e.id === exId);
-      return { id: exId, name: ex.name, img: ex.img, sets: [], notes: "" };
+      const ex = currentExerciseList.find(e => e.id === exId)
+            || (EXERCISES[currentMuscle] || []).find(e => e.id === exId)
+            || getCustomExercises(currentMuscle).find(e => e.id === exId);
+      return { id: exId, name: ex?.name || exId, img: ex?.img || "", sets: [], notes: "" };
     }),
   };
 
@@ -461,6 +523,7 @@ function deleteWorkout(id) {
   const history = getHistory().filter(w => w.id != id);
   localStorage.setItem("gymlog_history", JSON.stringify(history));
   renderHistory();
+  deleteWorkoutFromSupabase(id); // async, non-blocking
 }
 
 // ── Estadísticas ──────────────────────────────────────────
@@ -622,6 +685,14 @@ function findExerciseName(exId) {
     const ex = exs.find(e => e.id === exId);
     if (ex) return ex.name;
   }
+  // Check custom exercises
+  try {
+    const all = JSON.parse(localStorage.getItem("gymlog_custom_exercises") || "{}");
+    for (const exs of Object.values(all)) {
+      const ex = exs.find(e => e.id === exId);
+      if (ex) return ex.name;
+    }
+  } catch {}
   return exId;
 }
 
@@ -649,6 +720,7 @@ function checkAndUpdatePR(exId, kg, reps) {
   if (!prev || oneRM > (prev.oneRM || 0)) {
     prs[exId] = { kg, reps, oneRM, date: new Date().toISOString() };
     localStorage.setItem("gymlog_prs", JSON.stringify(prs));
+    syncPRToSupabase(exId, prs[exId]); // async, non-blocking
     return true;
   }
   return false;
@@ -754,6 +826,7 @@ function saveWorkout(workout) {
   const history = getHistory();
   history.push(workout);
   localStorage.setItem("gymlog_history", JSON.stringify(history));
+  syncWorkoutToSupabase(workout); // async, non-blocking
 }
 
 function getHistory() {
@@ -801,11 +874,184 @@ function closeModal() {
   document.getElementById("exercise-modal").classList.add("hidden");
 }
 
-// ── Init ──────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", () => {
+// ── Auth ──────────────────────────────────────────────────
+let authMode = "login";
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.querySelectorAll(".auth-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.mode === mode)
+  );
+  const btn = document.getElementById("auth-submit-btn");
+  if (btn) btn.textContent = mode === "login" ? "Iniciar sesión" : "Crear cuenta";
+  hideAuthError();
+}
+
+function hideAuthError() {
+  const el = document.getElementById("auth-error");
+  if (el) { el.classList.add("hidden"); el.textContent = ""; }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById("auth-error");
+  if (el) { el.classList.remove("hidden"); el.textContent = msg; }
+}
+
+async function handleAuth() {
+  const email    = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  if (!email || !password) { showAuthError("Rellena email y contraseña."); return; }
+
+  const btn = document.getElementById("auth-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Cargando…";
+  hideAuthError();
+
+  try {
+    const result = authMode === "login"
+      ? await db.auth.signInWithPassword({ email, password })
+      : await db.auth.signUp({ email, password });
+
+    if (result.error) {
+      showAuthError(translateAuthError(result.error.message));
+      btn.disabled = false;
+      btn.textContent = authMode === "login" ? "Iniciar sesión" : "Crear cuenta";
+      return;
+    }
+
+    if (authMode === "register" && !result.data.session) {
+      showAuthError("✉️ Revisa tu email para confirmar la cuenta y luego inicia sesión.");
+      btn.disabled = false;
+      btn.textContent = "Crear cuenta";
+      return;
+    }
+
+    currentUser = result.data.user;
+    await onSignedIn();
+  } catch (e) {
+    showAuthError("Error de conexión. Inténtalo de nuevo.");
+    btn.disabled = false;
+    btn.textContent = authMode === "login" ? "Iniciar sesión" : "Crear cuenta";
+  }
+}
+
+function translateAuthError(msg) {
+  if (msg.includes("Invalid login"))         return "Email o contraseña incorrectos.";
+  if (msg.includes("Email not confirmed"))   return "Confirma tu email antes de entrar.";
+  if (msg.includes("User already registered")) return "Ya existe una cuenta con ese email.";
+  if (msg.includes("Password should be"))    return "La contraseña debe tener al menos 6 caracteres.";
+  return msg;
+}
+
+async function onSignedIn() {
+  await syncFromSupabase();
   initMuscleGrid();
   renderHome();
+  goToNav("screen-home");
+  updateUserBar();
+}
 
+function updateUserBar() {
+  const bar = document.getElementById("home-user-bar");
+  if (!bar || !currentUser) return;
+  bar.innerHTML = `
+    <span class="user-email">👤 ${currentUser.email}</span>
+    <button class="user-logout-btn" onclick="logOut()">Salir</button>
+  `;
+  bar.classList.remove("hidden");
+}
+
+async function logOut() {
+  await db.auth.signOut();
+  currentUser = null;
+  localStorage.removeItem("gymlog_history");
+  localStorage.removeItem("gymlog_prs");
+  document.getElementById("home-user-bar")?.classList.add("hidden");
+  goTo("screen-auth");
+}
+
+// ── Supabase Sync ──────────────────────────────────────────
+async function syncFromSupabase() {
+  if (!currentUser) return;
+  try {
+    const [{ data: workouts }, { data: prs }] = await Promise.all([
+      db.from("workouts").select("*").eq("user_id", currentUser.id).order("date", { ascending: true }),
+      db.from("personal_records").select("*").eq("user_id", currentUser.id),
+    ]);
+
+    if (workouts) {
+      const mapped = workouts.map(w => ({
+        id: w.local_id,
+        date: w.date,
+        muscle: w.muscle,
+        exercises: w.exercises,
+        duration: w.duration,
+        totalSets: w.total_sets,
+        totalVolume: w.total_volume,
+      }));
+      localStorage.setItem("gymlog_history", JSON.stringify(mapped));
+    }
+
+    if (prs) {
+      const prMap = {};
+      prs.forEach(p => {
+        prMap[p.exercise_id] = { kg: p.kg, reps: p.reps, oneRM: p.one_rm, date: p.date };
+      });
+      localStorage.setItem("gymlog_prs", JSON.stringify(prMap));
+    }
+  } catch (e) {
+    console.warn("Sync error:", e);
+  }
+}
+
+async function syncWorkoutToSupabase(workout) {
+  if (!currentUser) return;
+  try {
+    await db.from("workouts").upsert({
+      local_id:     workout.id.toString(),
+      user_id:      currentUser.id,
+      date:         workout.date,
+      muscle:       workout.muscle,
+      exercises:    workout.exercises,
+      duration:     workout.duration,
+      total_sets:   workout.totalSets   || 0,
+      total_volume: workout.totalVolume || 0,
+    }, { onConflict: "user_id,local_id" });
+  } catch (e) {
+    console.warn("Workout sync error:", e);
+  }
+}
+
+async function deleteWorkoutFromSupabase(id) {
+  if (!currentUser) return;
+  try {
+    await db.from("workouts").delete()
+      .eq("user_id", currentUser.id)
+      .eq("local_id", id.toString());
+  } catch (e) {
+    console.warn("Delete sync error:", e);
+  }
+}
+
+async function syncPRToSupabase(exId, pr) {
+  if (!currentUser) return;
+  try {
+    await db.from("personal_records").upsert({
+      user_id:     currentUser.id,
+      exercise_id: exId,
+      kg:          pr.kg,
+      reps:        pr.reps,
+      one_rm:      pr.oneRM,
+      date:        pr.date,
+    }, { onConflict: "user_id,exercise_id" });
+  } catch (e) {
+    console.warn("PR sync error:", e);
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  // Setup UI listeners
   document.getElementById("rest-timer-overlay").addEventListener("click", function (e) {
     if (e.target === this) skipRestTimer();
   });
@@ -816,9 +1062,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const dx = e.changedTouches[0].clientX - touchStartX;
     if (dx > 80) {
       const active = document.querySelector(".screen.active");
-      if (active && active.id !== "screen-home" && active.id !== "screen-workout") {
+      if (active && !["screen-home", "screen-workout", "screen-auth"].includes(active.id)) {
         active.querySelector(".back-btn")?.click();
       }
     }
   }, { passive: true });
+
+  // Check existing session
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    currentUser = data.session.user;
+    await onSignedIn();
+  }
+  // else: screen-auth is already active (set in HTML)
+
+  // React to auth state changes (e.g. email confirmation link)
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === "SIGNED_IN" && session && !currentUser) {
+      currentUser = session.user;
+      await onSignedIn();
+    }
+  });
 });

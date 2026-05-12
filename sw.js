@@ -1,6 +1,6 @@
 // GymLog Service Worker — offline cache
-const CACHE = "gymlog-v2";
-const ASSETS = ["./", "./index.html", "./app.js", "./data.js", "./styles.css", "./manifest.json"];
+const CACHE = "gymlog-v3";
+const ASSETS = ["./", "./index.html", "./app.js", "./data.js", "./styles.css", "./manifest.json", "./supabase-config.js"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
